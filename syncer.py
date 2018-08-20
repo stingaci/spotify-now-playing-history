@@ -69,13 +69,11 @@ else:
 sp = SpotifyConn(username)
 sp.check_playlist_exists()
 
-#nph = NowPlayingHistory()
-nph = {}
+# Now Playing History
 nph = NowPlayingHistory(history_file)
 
-tracks = []
-
 # Collect all tracks
+tracks = []
 for track in nph.track_history:
     try:
         track_id = sp.search(track['artist'] + " " + track['title'])
