@@ -15,6 +15,7 @@ class SpotifyConn:
         self.user_id = self.sp.me()['id']
 
         self.playlist_name = "Now Playing History"
+        self.playlist_tracks = []
 
     def init_conn(self, username):
         scope = "playlist-modify-public"
@@ -27,15 +28,17 @@ class SpotifyConn:
             sys.exit(1)
 
     def check_playlist_exists(self):
-        exists = False
         playlists = self.sp.current_user_playlists()
         for playlist in playlists['items']:
             if playlist['name'] == self.playlist_name:
-                exists = True
                 self.playlist_id = playlist['id']
+                for track in self.sp.user_playlist_tracks(self.user_id, self.playlist_id)['items']:
+                    self.playlist_tracks.append(track['track']['uri'])
+                return
+                
+        self.playlist_id = self.sp.user_playlist_create(self.user_id, self.playlist_name)['id']
 
-        if not exists:
-            self.playlist_id = self.sp.user_playlist_create(self.user_id, self.playlist_name)['id']
+       
 
     def search(self, query):
         # Restrict results to 1
@@ -72,10 +75,33 @@ nph = NowPlayingHistory(history_file)
 
 tracks = []
 
+# Collect all tracks
 for track in nph.track_history:
-    track_id = sp.search(track['artist'] + " " + track['title'])
+    try:
+        track_id = sp.search(track['artist'] + " " + track['title'])
+    except:
+        pass
     if track_id:
-        tracks.append("spotify:track:" + track_id) 
+        track_uri = "spotify:track:" + track_id 
+        # Filter all duplicates
+        if track_uri not in tracks and track_uri not in sp.playlist_tracks:
+            tracks.append("spotify:track:" + track_id) 
 
-sp.add_tracks_to_playlist(tracks)
+
+# Add 25 tracks at once to prevent 413s
+batches = []
+counter = 0 
+batches.append([])
+
+for index, track in enumerate(tracks):
+    if index != 0 and index % 25 == 0:
+        counter = counter + 1
+        batches.append([])
+
+    batches[counter].append(track) 
+
+for batch in batches:
+    if batch:
+        sp.add_tracks_to_playlist(batch)
     
+        
